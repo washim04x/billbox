@@ -298,6 +298,29 @@ async function loadCustomers() {
     }
 }
 
+function searchCustomers() {
+    const term = document.getElementById('search-customers-input').value.toLowerCase();
+    const tbody = document.getElementById('customers-list');
+    tbody.innerHTML = '';
+    
+    const filtered = (currentCustomers || []).filter(c => 
+        (c.name && c.name.toLowerCase().includes(term)) || 
+        (c.phone && c.phone.includes(term))
+    );
+    
+    filtered.forEach((cust, index) => {
+        const delayClass = `delay-${(index % 5) + 1}`;
+        tbody.innerHTML += `
+            <tr onclick="viewCustomer(${cust.id})" style="cursor:pointer;" class="animate-item ${delayClass}">
+                <td><a href="#" class="text-link" onclick="event.preventDefault();">${cust.name}</a></td>
+                <td>${cust.phone}</td>
+                <td>${cust.address || '-'}</td>
+                <td style="color: var(--danger); font-weight: bold;">₹${parseFloat(cust.previousDue).toFixed(2)}</td>
+            </tr>
+        `;
+    });
+}
+
 async function loadCustomerSelect() {
     try {
         currentCustomers = await apiRequest('/customers');
