@@ -185,7 +185,7 @@ input:focus, textarea:focus, select:focus {
 .stat-details h3 { font-size: 2.2rem; }
 
 /* Tables */
-.table-responsive { overflow: visible; }
+.table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 15px; }
 .modern-table { width: 100%; border-collapse: separate; border-spacing: 0 8px; }
 .modern-table th { padding: 0 20px 10px; text-align: left; color: var(--text-light); font-weight: 800; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; border: none; }
 .modern-table td { padding: 20px; background: #ffffff; font-size: 1rem; font-weight: 600; border: none; transition: all 0.3s ease; }

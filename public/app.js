@@ -656,21 +656,34 @@ async function shareBill() {
         const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
         const file = new File([pdfBlob], filename, { type: 'application/pdf' });
 
-        // Check if browser supports sharing files
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-                title: 'Bill Invoice',
-                text: `Please find attached your bill for ₹${document.getElementById('print-grandtotal').innerText}`,
-                files: [file]
-            });
+        if (navigator.share) {
+            // navigator.canShare is not available on all browsers that support navigator.share
+            if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+                alert("Your browser/device doesn't support sharing PDF files directly. Please use the Print/PDF button to save it first.");
+            } else {
+                try {
+                    await navigator.share({
+                        title: 'Bill Invoice',
+                        text: `Please find attached your bill for ₹${document.getElementById('print-grandtotal').innerText}`,
+                        files: [file]
+                    });
+                } catch (shareErr) {
+                    if (shareErr.name !== 'AbortError') {
+                        console.error('Error sharing:', shareErr);
+                        if (shareErr.name === 'NotAllowedError') {
+                            alert("Sharing timed out or is not allowed. Please use the Print/PDF button to save the bill instead.");
+                        } else {
+                            alert("Could not share the file. Please use the Print/PDF button to save it first.");
+                        }
+                    }
+                }
+            }
         } else {
-            alert("Your browser/device doesn't support sharing files directly. Please use the Print/PDF button to save it first.");
+            alert("Your browser/device doesn't support sharing. Please use the Print/PDF button to save it first.");
         }
     } catch (err) {
-        console.error('Error sharing:', err);
-        if (err.name !== 'AbortError') {
-            alert("Something went wrong while sharing.");
-        }
+        console.error('Error generating PDF:', err);
+        alert("Something went wrong while preparing the bill for sharing.");
     } finally {
         if (shareBtn) {
             shareBtn.innerHTML = originalText;
