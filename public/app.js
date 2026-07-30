@@ -199,7 +199,7 @@ function setupEventListeners() {
 function navigateTo(viewId, tabBtn = null) {
     // Clear cached PDF when leaving bill preview
     if (viewId !== 'billPreview') {
-        preGeneratedShareFile = null;
+        preGeneratedPdfBlob = null;
     }
 
     document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
@@ -693,17 +693,16 @@ async function preGeneratePdf() {
     }
 }
 
-// Reliably download the PDF to the phone's storage, then open share sheet
+// Reliably download the PDF (works on laptop AND mobile)
 async function shareBill() {
     const shareBtn = document.querySelector('button[onclick="shareBill()"]');
     const originalText = shareBtn ? shareBtn.innerHTML : '';
     const filename = `Bill_${document.getElementById('print-bill-no').innerText}.pdf`;
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-    // Show loading
     if (shareBtn) { shareBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing...'; shareBtn.disabled = true; }
 
     try {
-        // Use pre-generated blob if available, otherwise generate now
         let blob = preGeneratedPdfBlob;
         if (!blob) {
             const element = document.getElementById('printable-bill');
@@ -718,34 +717,26 @@ async function shareBill() {
             preGeneratedPdfBlob = blob;
         }
 
-        // Create a fresh File object from the blob
         const file = new File([blob], filename, { type: 'application/pdf' });
 
-        // Re-enable button before showing share sheet (important for gesture timing)
+        // Re-enable button before any share/download action
         if (shareBtn) { shareBtn.innerHTML = originalText; shareBtn.disabled = false; }
 
-        // Try Web Share API with file attachment
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-            try {
-                await navigator.share({ title: 'Bill Invoice', files: [file] });
-                return; // Success!
-            } catch(e) {
-                if (e.name === 'AbortError') return; // User cancelled, don't download
-                // If share failed for any other reason, fall through to download
+        // On mobile: try native share API first (shows WhatsApp, Telegram, etc)
+        if (isMobile && navigator.share) {
+            let shared = false;
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try { await navigator.share({ title: 'Bill Invoice', files: [file] }); shared = true; }
+                catch(e) { if (e.name === 'AbortError') return; }
             }
-        } else if (navigator.share) {
-            // Try without file (some browsers support share but not canShare)
-            try {
-                await navigator.share({ title: 'Bill Invoice', files: [file] });
-                return;
-            } catch(e) {
-                if (e.name === 'AbortError') return;
-                // Fall through to download
+            if (!shared) {
+                try { await navigator.share({ title: 'Bill Invoice', files: [file] }); shared = true; }
+                catch(e) { if (e.name === 'AbortError') return; }
             }
+            if (shared) return; // Success via share API
         }
 
-        // GUARANTEED FALLBACK: Direct download to phone storage
-        // This ALWAYS works on any browser/device
+        // GUARANTEED: Direct download — works on ALL devices (laptop, mobile, tablet)
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -755,13 +746,16 @@ async function shareBill() {
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 5000);
 
-        // Show a nice toast message
-        showToast('✅ PDF saved to your Downloads folder! Open it to share via WhatsApp.');
+        if (isMobile) {
+            showToast('✅ PDF saved! Open your Downloads folder to share via WhatsApp.');
+        } else {
+            showToast('✅ PDF downloaded! Check your Downloads folder.');
+        }
 
     } catch(err) {
         console.error('Share/Download error:', err);
         if (shareBtn) { shareBtn.innerHTML = originalText; shareBtn.disabled = false; }
-        showToast('❌ Error preparing PDF. Please try Print/PDF button.');
+        showToast('❌ Error preparing PDF. Please try the PDF button instead.');
     }
 }
 
