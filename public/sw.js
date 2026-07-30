@@ -1,4 +1,4 @@
-const CACHE_NAME = 'billbox-v6';
+const CACHE_NAME = 'billbox-v7';
 const ASSETS = [
     './',
     './index.html',

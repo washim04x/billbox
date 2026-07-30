@@ -329,10 +329,11 @@
         <!-- View 5: Bill Preview (for print/share) -->
         <section id="view-billPreview" class="view" style="display: none;">
             <div class="preview-actions">
-                <button onclick="navigateTo('dashboard')" class="btn-secondary"><i class="fa-solid fa-arrow-left"></i> Back</button>
-                <div class="action-btns">
-                    <button onclick="shareBill()" class="btn-secondary"><i class="fa-solid fa-share-nodes"></i> Share</button>
-                    <button onclick="printBill()" class="btn-primary"><i class="fa-solid fa-print"></i> Print / PDF</button>
+                <button onclick="navigateTo('dashboard')" class="btn-secondary"><i class="fa-solid fa-xmark"></i> Close</button>
+                <div class="action-btns" style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button onclick="shareToWhatsApp()" class="btn-wa" id="wa-share-btn"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+                    <button onclick="shareBill()" class="btn-secondary" id="main-share-btn"><i class="fa-solid fa-share-nodes"></i> Share</button>
+                    <button onclick="printBill()" class="btn-primary"><i class="fa-solid fa-print"></i> PDF</button>
                 </div>
             </div>
 
