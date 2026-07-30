@@ -127,52 +127,23 @@
 
             <div class="recent-bills glass-card mt-20 animate-item delay-4">
                 <h3>Recent Bills</h3>
-                <div class="table-responsive">
-                    <table class="modern-table">
-                        <thead>
-                            <tr>
-                                <th>Bill No</th>
-                                <th>Customer</th>
-                                <th>Date</th>
-                                <th>Bill Amt</th>
-                                <th>Received</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="recent-bills-list">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
+                <div class="bill-card-list" id="recent-bills-list">
+                    <!-- Populated by JS -->
                 </div>
             </div>
         </section>
 
-        <!-- View 3: Customers -->
         <section id="view-customers" class="view" style="display: none;">
             <div class="header-section">
                 <h2>Customers</h2>
-                <button onclick="showAddCustomerModal()" class="btn-primary"><i class="fa-solid fa-plus"></i> Add Customer</button>
+                <button onclick="showAddCustomerModal()" class="btn-primary" style="padding:10px 16px;font-size:0.85rem;"><i class="fa-solid fa-plus"></i> Add</button>
             </div>
-            
-            <div class="glass-card">
-                <div class="form-group" style="margin-bottom: 20px;">
-                    <input type="text" id="search-customers-input" onkeyup="searchCustomers()" placeholder="Search customers by name or phone..." style="width: 100%; border: 1px solid var(--border); padding: 12px 20px;">
-                </div>
-                <div class="table-responsive">
-                    <table class="modern-table">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Phone</th>
-                                <th>Address</th>
-                                <th>Current Due</th>
-                            </tr>
-                        </thead>
-                        <tbody id="customers-list">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
-                </div>
+            <div class="search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="search-customers-input" onkeyup="searchCustomers()" placeholder="Search by name or phone...">
+            </div>
+            <div class="customer-card-list" id="customers-list">
+                <!-- Populated by JS -->
             </div>
         </section>
 
@@ -258,14 +229,15 @@
                     </div>
                 </div>
 
-                <!-- Add Items -->
                 <div class="bill-section mt-20">
                     <h3>2. Add Items</h3>
                     <div class="item-add-form">
                         <input type="text" id="item-name" placeholder="Item Name" class="form-input">
-                        <input type="number" id="item-qty" placeholder="Qty" class="form-input" min="1">
-                        <input type="number" id="item-rate" placeholder="Rate" class="form-input" min="0" step="0.01">
-                        <button onclick="addBillItem()" class="btn-secondary">Add</button>
+                        <div class="item-row-inputs">
+                            <input type="number" id="item-qty" placeholder="Qty" class="form-input" min="1">
+                            <input type="number" id="item-rate" placeholder="Rate ₹" class="form-input" min="0" step="0.01">
+                        </div>
+                        <button onclick="addBillItem()" class="btn-primary w-100"><i class="fa-solid fa-plus"></i> Add Item</button>
                     </div>
                     
                     <div class="table-responsive mt-10">
@@ -392,46 +364,46 @@
 
     </main>
 
-    <!-- Modal for adding customer -->
     <div id="addCustomerModal" class="modal">
-        <div class="modal-content glass-card">
+        <div class="modal-content">
+            <div class="modal-handle"></div>
             <span class="close" onclick="closeAddCustomerModal()">&times;</span>
-            <h2>Add New Customer</h2>
+            <h2 style="margin-bottom:18px;font-size:1.2rem;">Add New Customer</h2>
             <form id="add-customer-form">
                 <div class="form-group">
-                    <label>Name</label>
-                    <input type="text" id="cust-name" required>
+                    <label>Name *</label>
+                    <input type="text" id="cust-name" required placeholder="Customer name">
                 </div>
                 <div class="form-group">
-                    <label>Phone</label>
-                    <input type="text" id="cust-phone" required>
+                    <label>Phone *</label>
+                    <input type="tel" id="cust-phone" required placeholder="Phone number">
                 </div>
                 <div class="form-group">
                     <label>Address</label>
-                    <input type="text" id="cust-address">
+                    <input type="text" id="cust-address" placeholder="Address (optional)">
                 </div>
                 <div class="form-group">
-                    <label>Previous Due (if any)</label>
-                    <input type="number" id="cust-prevdue" value="0" step="0.01">
+                    <label>Previous Due (₹)</label>
+                    <input type="number" id="cust-prevdue" value="0" step="0.01" min="0">
                 </div>
-                <button type="submit" class="btn-primary w-100">Add Customer</button>
+                <button type="submit" class="btn-primary w-100 btn-large">Add Customer</button>
             </form>
         </div>
     </div>
 
-    <!-- Mobile Tab Bar (for Android feel) -->
+    <!-- Mobile Tab Bar (native app feel) -->
     <div class="mobile-tab-bar" id="mobile-tab-bar" style="display: none;">
         <button class="tab-btn active" onclick="navigateTo('dashboard', this)">
-            <i class="fa-solid fa-file-invoice"></i>
+            <i class="fa-solid fa-chart-pie"></i>
             <span>Bills</span>
-        </button>
-        <button class="tab-btn" onclick="navigateTo('createBill', this)">
-            <i class="fa-solid fa-plus-square"></i>
-            <span>Create</span>
         </button>
         <button class="tab-btn" onclick="navigateTo('customers', this)">
             <i class="fa-solid fa-users"></i>
             <span>Customers</span>
+        </button>
+        <button class="tab-btn create-tab" onclick="navigateTo('createBill', this)">
+            <i class="fa-solid fa-plus"></i>
+            <span>New Bill</span>
         </button>
         <button class="tab-btn" onclick="navigateTo('setup', this)">
             <i class="fa-solid fa-cog"></i>

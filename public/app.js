@@ -260,20 +260,30 @@ async function loadDashboard() {
         document.getElementById('stat-billed').innerText = `₹${parseFloat(stats.totalBilled).toFixed(2)}`;
 
         const bills = await apiRequest('/bills');
-        const tbody = document.getElementById('recent-bills-list');
-        tbody.innerHTML = '';
-        bills.slice(0, 10).forEach((bill, index) => {
-            const status = bill.newDueAmount <= 0 ? '<span style="color:var(--success)">Paid</span>' : `<span style="color:var(--danger)">Due(₹${parseFloat(bill.newDueAmount).toFixed(2)})</span>`;
+        const container = document.getElementById('recent-bills-list');
+        container.innerHTML = '';
+        if (bills.length === 0) {
+            container.innerHTML = `<div style="text-align:center;padding:32px 16px;color:var(--text-3);"><i class="fa-solid fa-file-invoice" style="font-size:2rem;margin-bottom:12px;display:block;"></i><p style="font-size:0.9rem;">No bills yet.<br>Tap <strong>New Bill</strong> to create one!</p></div>`;
+            return;
+        }
+        bills.slice(0, 15).forEach((bill, index) => {
+            const isPaid = bill.newDueAmount <= 0;
+            const badge = isPaid
+                ? `<span class="bill-row-badge badge-paid"><i class="fa-solid fa-check"></i> Paid</span>`
+                : `<span class="bill-row-badge badge-due">Due ₹${parseFloat(bill.newDueAmount).toFixed(0)}</span>`;
             const delayClass = `delay-${(index % 5) + 1}`;
-            tbody.innerHTML += `
-                <tr class="animate-item ${delayClass}">
-                    <td>#${bill.id}</td>
-                    <td><a href="#" onclick="viewCustomer(${bill.customerId}); return false;" class="text-link">${bill.customerName}</a></td>
-                    <td>${bill.billDate}</td>
-                    <td>₹${parseFloat(bill.grandTotal).toFixed(2)}</td>
-                    <td>₹${parseFloat(bill.receivedAmount || 0).toFixed(2)}</td>
-                    <td>${status}</td>
-                </tr>
+            container.innerHTML += `
+                <div class="bill-row-card animate-item ${delayClass}" onclick="viewCustomer(${bill.customerId})">
+                    <div class="bill-row-icon"><i class="fa-solid fa-file-invoice"></i></div>
+                    <div class="bill-row-info">
+                        <div class="bill-row-name">${bill.customerName}</div>
+                        <div class="bill-row-meta">#${bill.id} &bull; ${bill.billDate}</div>
+                    </div>
+                    <div class="bill-row-right">
+                        <div class="bill-row-amount">₹${parseFloat(bill.grandTotal).toFixed(0)}</div>
+                        ${badge}
+                    </div>
+                </div>
             `;
         });
     } catch (error) {
@@ -282,22 +292,39 @@ async function loadDashboard() {
 }
 
 // Customers
+function renderCustomerCards(customers, container) {
+    container.innerHTML = '';
+    if (customers.length === 0) {
+        container.innerHTML = `<div style="text-align:center;padding:32px 16px;color:var(--text-3);"><i class="fa-solid fa-users" style="font-size:2rem;margin-bottom:12px;display:block;"></i><p style="font-size:0.9rem;">No customers found.</p></div>`;
+        return;
+    }
+    customers.forEach((cust, index) => {
+        const due = parseFloat(cust.previousDue);
+        const initials = cust.name ? cust.name.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase() : '?';
+        const dueColor = due > 0 ? 'var(--danger)' : 'var(--success)';
+        const dueLabel = due > 0 ? `₹${due.toFixed(0)} Due` : 'Cleared';
+        const delayClass = `delay-${(index % 5) + 1}`;
+        container.innerHTML += `
+            <div class="customer-card animate-item ${delayClass}" onclick="viewCustomer(${cust.id})">
+                <div class="customer-avatar">${initials}</div>
+                <div class="customer-info">
+                    <div class="customer-name">${cust.name}</div>
+                    <div class="customer-phone"><i class="fa-solid fa-phone" style="font-size:0.7rem;"></i> ${cust.phone}</div>
+                </div>
+                <div class="customer-due">
+                    <div class="customer-due-amount" style="color:${dueColor};">${dueLabel}</div>
+                    <div class="customer-due-label">Balance</div>
+                </div>
+            </div>
+        `;
+    });
+}
+
 async function loadCustomers() {
     try {
         currentCustomers = await apiRequest('/customers');
-        const tbody = document.getElementById('customers-list');
-        tbody.innerHTML = '';
-        currentCustomers.forEach((cust, index) => {
-            const delayClass = `delay-${(index % 5) + 1}`;
-            tbody.innerHTML += `
-                <tr onclick="viewCustomer(${cust.id})" style="cursor:pointer;" class="animate-item ${delayClass}">
-                    <td><a href="#" class="text-link" onclick="event.preventDefault();">${cust.name}</a></td>
-                    <td>${cust.phone}</td>
-                    <td>${cust.address || '-'}</td>
-                    <td style="color: var(--danger); font-weight: bold;">₹${parseFloat(cust.previousDue).toFixed(2)}</td>
-                </tr>
-            `;
-        });
+        const container = document.getElementById('customers-list');
+        renderCustomerCards(currentCustomers, container);
     } catch (error) {
         console.error(error);
     }
@@ -305,25 +332,12 @@ async function loadCustomers() {
 
 function searchCustomers() {
     const term = document.getElementById('search-customers-input').value.toLowerCase();
-    const tbody = document.getElementById('customers-list');
-    tbody.innerHTML = '';
-    
-    const filtered = (currentCustomers || []).filter(c => 
-        (c.name && c.name.toLowerCase().includes(term)) || 
+    const container = document.getElementById('customers-list');
+    const filtered = (currentCustomers || []).filter(c =>
+        (c.name && c.name.toLowerCase().includes(term)) ||
         (c.phone && c.phone.includes(term))
     );
-    
-    filtered.forEach((cust, index) => {
-        const delayClass = `delay-${(index % 5) + 1}`;
-        tbody.innerHTML += `
-            <tr onclick="viewCustomer(${cust.id})" style="cursor:pointer;" class="animate-item ${delayClass}">
-                <td><a href="#" class="text-link" onclick="event.preventDefault();">${cust.name}</a></td>
-                <td>${cust.phone}</td>
-                <td>${cust.address || '-'}</td>
-                <td style="color: var(--danger); font-weight: bold;">₹${parseFloat(cust.previousDue).toFixed(2)}</td>
-            </tr>
-        `;
-    });
+    renderCustomerCards(filtered, container);
 }
 
 async function loadCustomerSelect() {
