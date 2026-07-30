@@ -197,6 +197,11 @@ function setupEventListeners() {
 
 // Navigation
 function navigateTo(viewId, tabBtn = null) {
+    // Clear cached PDF when leaving bill preview
+    if (viewId !== 'billPreview') {
+        preGeneratedShareFile = null;
+    }
+
     document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
     document.getElementById('view-' + viewId).style.display = 'block';
 
@@ -637,6 +642,9 @@ function renderPrintPreview(billData) {
         sigImg.src = '';
         sigImg.style.display = 'none';
     }
+
+    // Kick off background PDF generation so it's ready when user taps Share
+    setTimeout(() => preGeneratePdf(), 500);
 }
 
 function printBill() {
@@ -651,120 +659,122 @@ function printBill() {
     html2pdf().set(opt).from(element).save();
 }
 
+// Holds the PDF file pre-generated in the background so Share works instantly
 let preGeneratedShareFile = null;
+let isPdfGenerating = false;
+
+// Called automatically after the bill preview renders — generates PDF silently in background
+async function preGeneratePdf() {
+    const element = document.getElementById('printable-bill');
+    if (!element || isPdfGenerating) return;
+    const filename = `Bill_${document.getElementById('print-bill-no').innerText}.pdf`;
+    const opt = {
+        margin: 0.2,
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.92 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+    isPdfGenerating = true;
+    try {
+        const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+        preGeneratedShareFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+        // Signal the share button that the PDF is ready
+        const shareBtn = document.querySelector('button[onclick="shareBill()"]');
+        if (shareBtn && !shareBtn.disabled) {
+            shareBtn.innerHTML = '<i class="fa-solid fa-share-nodes"></i> Share';
+            shareBtn.classList.remove('btn-secondary');
+            shareBtn.classList.add('btn-primary');
+        }
+    } catch(e) {
+        console.warn('Background PDF generation failed:', e);
+    } finally {
+        isPdfGenerating = false;
+    }
+}
 
 async function shareBill() {
-    const element = document.getElementById('printable-bill');
     const filename = `Bill_${document.getElementById('print-bill-no').innerText}.pdf`;
-    
-    // Find the button and show loading state
-    const btns = document.querySelectorAll('button');
-    let shareBtn = null;
-    btns.forEach(b => { if (b.getAttribute('onclick') === 'shareBill()') shareBtn = b; });
-    
-    // If we already generated the file due to a timeout, just share it instantly.
+    const grandTotal = document.getElementById('print-grandtotal').innerText;
+    const shareData = {
+        title: 'Bill Invoice',
+        text: `Please find attached your bill for ₹${grandTotal}`
+    };
+
+    // ✅ BEST CASE: PDF was pre-generated in background — share it instantly!
     if (preGeneratedShareFile) {
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: 'Bill Invoice',
-                    text: `Please find attached your bill for ₹${document.getElementById('print-grandtotal').innerText}`,
-                    files: [preGeneratedShareFile]
-                });
-            } catch(e) {
-                if (e.name !== 'AbortError') alert("Could not share. Please use the Print/PDF button.");
-            }
+        if (!navigator.share) {
+            alert("Your browser doesn't support sharing. Please use Print/PDF to save the bill.");
+            return;
         }
-        // Reset the button
-        preGeneratedShareFile = null;
-        if (shareBtn) {
-            shareBtn.innerHTML = '<i class="fa-solid fa-share-nodes"></i> Share';
-            shareBtn.classList.remove('btn-primary');
-            shareBtn.classList.add('btn-secondary');
+        try {
+            await navigator.share({ ...shareData, files: [preGeneratedShareFile] });
+        } catch(e) {
+            if (e.name !== 'AbortError') {
+                // File sharing not supported, try sharing text/URL instead
+                try { await navigator.share(shareData); } catch(e2) { /* user cancelled */ }
+            }
         }
         return;
     }
 
+    // ⚠️ FALLBACK: PDF not ready yet — generate and use 2-step approach
+    const shareBtn = document.querySelector('button[onclick="shareBill()"]');
+    let originalText = shareBtn ? shareBtn.innerHTML : '';
+    if (shareBtn) { shareBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing...'; shareBtn.disabled = true; }
+
+    const element = document.getElementById('printable-bill');
     const opt = {
         margin: 0.2,
         filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        image: { type: 'jpeg', quality: 0.92 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
 
-    let originalText = '';
-    if (shareBtn) {
-        originalText = shareBtn.innerHTML;
-        shareBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing...';
-        shareBtn.disabled = true;
-    }
-
     try {
-        // Generate PDF as Blob
         const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
         const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+        // Store it so user can tap again instantly
+        preGeneratedShareFile = file;
 
-        if (navigator.share) {
-            // navigator.canShare is not available on all browsers that support navigator.share
-            if (navigator.canShare && !navigator.canShare({ files: [file] })) {
-                alert("Your browser/device doesn't support sharing PDF files directly. Please use the Print/PDF button to save it first.");
+        if (!navigator.share) {
+            alert("Your browser doesn't support sharing. Please use Print/PDF.");
+            if (shareBtn) { shareBtn.innerHTML = originalText; shareBtn.disabled = false; }
+            return;
+        }
+        if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+            // PDF file sharing blocked — try text-only share
+            try { await navigator.share(shareData); } catch(e) { /* cancelled */ }
+            if (shareBtn) { shareBtn.innerHTML = originalText; shareBtn.disabled = false; }
+            return;
+        }
+
+        try {
+            await navigator.share({ ...shareData, files: [file] });
+            if (shareBtn) { shareBtn.innerHTML = originalText; shareBtn.disabled = false; }
+        } catch (shareErr) {
+            if (shareErr.name === 'NotAllowedError') {
+                // Gesture expired — prompt user to tap again
                 if (shareBtn) {
-                    shareBtn.innerHTML = originalText;
+                    shareBtn.innerHTML = '<i class="fa-solid fa-check"></i> Tap Again to Share';
+                    shareBtn.classList.remove('btn-secondary');
+                    shareBtn.classList.add('btn-primary');
                     shareBtn.disabled = false;
                 }
-                return;
-            }
-            
-            try {
-                await navigator.share({
-                    title: 'Bill Invoice',
-                    text: `Please find attached your bill for ₹${document.getElementById('print-grandtotal').innerText}`,
-                    files: [file]
-                });
-                
-                if (shareBtn) {
-                    shareBtn.innerHTML = originalText;
-                    shareBtn.disabled = false;
-                }
-            } catch (shareErr) {
-                if (shareErr.name === 'NotAllowedError') {
-                    // User gesture expired! Require one more click.
-                    preGeneratedShareFile = file;
-                    if (shareBtn) {
-                        shareBtn.innerHTML = '<i class="fa-solid fa-check"></i> Tap to Share Now';
-                        shareBtn.classList.remove('btn-secondary');
-                        shareBtn.classList.add('btn-primary'); // Make it stand out
-                        shareBtn.disabled = false;
-                    }
-                } else if (shareErr.name !== 'AbortError') {
-                    alert("Could not share the file. Please use the Print/PDF button to save it first.");
-                    if (shareBtn) {
-                        shareBtn.innerHTML = originalText;
-                        shareBtn.disabled = false;
-                    }
-                } else {
-                    // Aborted by user
-                    if (shareBtn) {
-                        shareBtn.innerHTML = originalText;
-                        shareBtn.disabled = false;
-                    }
-                }
-            }
-        } else {
-            alert("Your browser/device doesn't support sharing. Please use the Print/PDF button to save it first.");
-            if (shareBtn) {
-                shareBtn.innerHTML = originalText;
-                shareBtn.disabled = false;
+            } else if (shareErr.name !== 'AbortError') {
+                // Try text-only as last resort
+                try { await navigator.share(shareData); } catch(e) { /* cancelled */ }
+                if (shareBtn) { shareBtn.innerHTML = originalText; shareBtn.disabled = false; }
+            } else {
+                if (shareBtn) { shareBtn.innerHTML = originalText; shareBtn.disabled = false; }
             }
         }
     } catch (err) {
-        console.error('Error generating PDF:', err);
-        alert("Something went wrong while preparing the bill for sharing.");
-        if (shareBtn) {
-            shareBtn.innerHTML = originalText;
-            shareBtn.disabled = false;
-        }
+        console.error('PDF generation error:', err);
+        if (shareBtn) { shareBtn.innerHTML = originalText; shareBtn.disabled = false; }
+        // Last resort: share text only
+        if (navigator.share) { try { await navigator.share(shareData); } catch(e) { /* cancelled */ } }
     }
 }
 
