@@ -1,0 +1,32 @@
+# Context Goal
+Create a web-based billing application (BillBox) that will later be converted into an Android app. 
+The app is for a small business (e.g., A S Start Garments) to generate bills for customers, track previous due amounts, and manage overall sales and dues.
+
+# Tech Stack
+- Frontend: HTML, CSS (Mobile-first, modern UI), JavaScript.
+- Backend: Node.js with Express.js.
+- Database: SQLite (chosen over MySQL for zero-configuration local setup, perfectly simulating SQL operations).
+
+# Features
+1. User Profile: Set brand name, address, phone, email once.
+2. Customer DB: Store Name, Phone (Primary Key), Address, Previous Due Amount.
+3. Billing Interface: 
+   - Add items (Qty * Rate = Amount).
+   - Add previous due amount.
+   - Calculate Sub Total, Discount, Tax, Grand Total Due.
+   - Input Received Amount.
+   - Calculate New Due Amount and update Customer DB.
+4. Dashboards:
+   - Overall: Total Billed, Total Received, Total Due across all customers.
+   - Customer-wise: History of transactions and dues for a specific customer.
+5. Actions: Print to PDF, Share (using Web Share API).
+
+# Current Progression
+- Project files (API, DB schema, UI) have been created successfully.
+- Waiting for user to install Node.js to run and verify the app.
+
+# What Needs to be Updated Next
+- User needs to install Node.js on their Windows machine.
+- Run `npm install` and `node server.js` in the project directory.
+- Test the web application at http://localhost:3000.
+- Plan for Android app conversion.

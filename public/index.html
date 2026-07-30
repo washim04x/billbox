@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BillBox</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- html2pdf for printing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Google Drive API -->
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+</head>
+<body>
+    
+    <!-- Top Navigation -->
+    <nav class="navbar" id="navbar" style="display: none;">
+        <div class="nav-brand">
+            <i class="fa-solid fa-file-invoice-dollar"></i> BillBox
+        </div>
+            <button onclick="navigateTo('dashboard')" class="nav-btn"><i class="fa-solid fa-chart-pie"></i> Dashboard</button>
+            <button onclick="navigateTo('customers')" class="nav-btn"><i class="fa-solid fa-users"></i> Customers</button>
+            <button onclick="navigateTo('setup')" class="nav-btn"><i class="fa-solid fa-cog"></i> Profile</button>
+            <button onclick="navigateTo('createBill')" class="nav-btn primary"><i class="fa-solid fa-plus"></i> New Bill</button>
+        </div>
+    </nav>
+
+    <!-- App Container -->
+    <main id="app-container">
+        
+        <!-- View 1: Setup Profile -->
+        <section id="view-setup" class="view">
+            <div class="glass-card setup-card">
+                <h2>Business Profile</h2>
+                <p>Update your business details and digital signature.</p>
+                <form id="setup-form">
+                    <div class="form-group">
+                        <label>Business Name</label>
+                        <input type="text" id="setup-brandName" required placeholder="e.g. A S Start Garments">
+                    </div>
+                    <div class="form-group">
+                        <label>Address</label>
+                        <textarea id="setup-address" required placeholder="Full address"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input type="tel" id="setup-phone" required placeholder="e.g. 9094234234">
+                    </div>
+                    <div class="form-group">
+                        <label>Email ID</label>
+                        <input type="email" id="setup-email" required placeholder="e.g. star786ar@gmail.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Digital Signature (Optional)</label>
+                        <input type="file" id="setup-signature" accept="image/*" style="padding: 10px;">
+                        <small class="text-muted" style="display: block; margin-top: 5px; font-size: 0.85rem;">Upload an image of your signature to display on bills.</small>
+                    </div>
+                    <button type="submit" class="btn-primary w-100">Save & Continue</button>
+
+                    <hr>
+                    <h3 style="margin: 20px 0 10px; font-size: 1.1rem; color: var(--primary);">Data Backup & Restore</h3>
+                    
+                    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #bbf7d0; text-align: center; margin-bottom: 15px;">
+                        <h4 style="color: #166534; margin-bottom: 10px;"><i class="fa-brands fa-google-drive"></i> Google Drive Cloud Sync</h4>
+                        <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 15px;">Automatically backs up your data once a day when you open the app. You can also manually sync.</p>
+                        
+                        <div id="gdrive-auth-container" style="margin-bottom: 10px;">
+                            <button type="button" class="btn-primary" onclick="handleAuthClick()" style="padding: 10px 20px; font-size: 0.9rem; margin: 0 auto;"><i class="fa-brands fa-google"></i> Connect Google Drive</button>
+                        </div>
+                        
+                        <div id="gdrive-actions-container" style="display: none; flex-direction: column; gap: 10px;">
+                            <div style="display: flex; gap: 10px; justify-content: center;">
+                                <button type="button" class="btn-secondary" onclick="backupToGDrive()"><i class="fa-solid fa-cloud-arrow-up"></i> Backup to Drive</button>
+                                <button type="button" class="btn-secondary" onclick="restoreFromGDrive()"><i class="fa-solid fa-cloud-arrow-down"></i> Restore from Drive</button>
+                            </div>
+                            <button type="button" class="btn-secondary" onclick="handleSignoutClick()" style="color: var(--danger); margin: 0 auto; padding: 5px 15px; font-size: 0.8rem;">Disconnect</button>
+                        </div>
+                        <p id="gdrive-status" style="font-size: 0.85rem; color: #15803d; margin-top: 10px; font-weight: bold;"></p>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn-secondary w-100" onclick="exportBackup()"><i class="fa-solid fa-download"></i> Local Backup</button>
+                        <button type="button" class="btn-secondary w-100" onclick="document.getElementById('import-file').click()"><i class="fa-solid fa-upload"></i> Local Restore</button>
+                        <input type="file" id="import-file" style="display: none;" accept=".json" onchange="importBackup(event)">
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- View 2: Dashboard -->
+        <section id="view-dashboard" class="view" style="display: none;">
+            <div class="header-section">
+                <h2>Dashboard</h2>
+                <p id="dash-brand-name">Your Business</p>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card animate-item delay-1">
+                    <div class="stat-icon due"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+                    <div class="stat-details">
+                        <p>Total Due</p>
+                        <h3 id="stat-due">₹0.00</h3>
+                    </div>
+                </div>
+                <div class="stat-card animate-item delay-2">
+                    <div class="stat-icon received"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+                    <div class="stat-details">
+                        <p>Total Received</p>
+                        <h3 id="stat-received">₹0.00</h3>
+                    </div>
+                </div>
+                <div class="stat-card animate-item delay-3">
+                    <div class="stat-icon billed"><i class="fa-solid fa-file-invoice"></i></div>
+                    <div class="stat-details">
+                        <p>Total Billed</p>
+                        <h3 id="stat-billed">₹0.00</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="recent-bills glass-card mt-20 animate-item delay-4">
+                <h3>Recent Bills</h3>
+                <div class="table-responsive">
+                    <table class="modern-table">
+                        <thead>
+                            <tr>
+                                <th>Bill No</th>
+                                <th>Customer</th>
+                                <th>Date</th>
+                                <th>Bill Amt</th>
+                                <th>Received</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-bills-list">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- View 3: Customers -->
+        <section id="view-customers" class="view" style="display: none;">
+            <div class="header-section">
+                <h2>Customers</h2>
+                <button onclick="showAddCustomerModal()" class="btn-primary"><i class="fa-solid fa-plus"></i> Add Customer</button>
+            </div>
+            
+            <div class="glass-card">
+                <div class="table-responsive">
+                    <table class="modern-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Phone</th>
+                                <th>Address</th>
+                                <th>Current Due</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customers-list">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- View 3.5: Customer Dashboard -->
+        <section id="view-customerDashboard" class="view" style="display: none;">
+            <div class="preview-actions">
+                <button onclick="navigateTo('customers')" class="btn-secondary"><i class="fa-solid fa-arrow-left"></i> Back to Customers</button>
+            </div>
+            <div class="header-section">
+                <div>
+                    <h2 id="cd-name">Customer Name</h2>
+                    <p id="cd-phone" class="text-muted mt-10">Phone</p>
+                </div>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card animate-item delay-1">
+                    <div class="stat-icon due"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+                    <div class="stat-details">
+                        <p>Current Due</p>
+                        <h3 id="cd-stat-due">₹0.00</h3>
+                    </div>
+                </div>
+                <div class="stat-card animate-item delay-2">
+                    <div class="stat-icon received"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+                    <div class="stat-details">
+                        <p>Total Paid</p>
+                        <h3 id="cd-stat-received">₹0.00</h3>
+                    </div>
+                </div>
+                <div class="stat-card animate-item delay-3">
+                    <div class="stat-icon billed"><i class="fa-solid fa-file-invoice"></i></div>
+                    <div class="stat-details">
+                        <p>Total Billed</p>
+                        <h3 id="cd-stat-billed">₹0.00</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="recent-bills glass-card mt-20 animate-item delay-4">
+                <h3>Billing History</h3>
+                <div class="table-responsive mt-10">
+                    <table class="modern-table">
+                        <thead>
+                            <tr>
+                                <th>Bill No</th>
+                                <th>Date</th>
+                                <th>Bill Amt</th>
+                                <th>Received</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cd-bills-list">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- View 4: Create Bill -->
+        <section id="view-createBill" class="view" style="display: none;">
+            <div class="header-section">
+                <h2>Create Bill</h2>
+            </div>
+            
+            <div class="bill-creator glass-card">
+                <!-- Customer Selection -->
+                <div class="bill-section">
+                    <h3>1. Select Customer</h3>
+                    <div class="customer-select-area">
+                        <select id="bill-customer-select" class="form-input">
+                            <option value="">-- Select Customer --</option>
+                            <!-- Populated by JS -->
+                        </select>
+                        <button onclick="showAddCustomerModal()" class="btn-secondary">New</button>
+                    </div>
+                    <div id="bill-customer-details" class="customer-info-box mt-10" style="display: none;">
+                        <p><strong>Name:</strong> <span id="bc-name"></span></p>
+                        <p><strong>Phone:</strong> <span id="bc-phone"></span></p>
+                        <p><strong>Previous Due:</strong> ₹<span id="bc-prevDue">0.00</span></p>
+                    </div>
+                </div>
+
+                <!-- Add Items -->
+                <div class="bill-section mt-20">
+                    <h3>2. Add Items</h3>
+                    <div class="item-add-form">
+                        <input type="text" id="item-name" placeholder="Item Name" class="form-input">
+                        <input type="number" id="item-qty" placeholder="Qty" class="form-input" min="1">
+                        <input type="number" id="item-rate" placeholder="Rate" class="form-input" min="0" step="0.01">
+                        <button onclick="addBillItem()" class="btn-secondary">Add</button>
+                    </div>
+                    
+                    <div class="table-responsive mt-10">
+                        <table class="modern-table">
+                            <thead>
+                                <tr>
+                                    <th>S.No</th>
+                                    <th>Item</th>
+                                    <th>Qty</th>
+                                    <th>Rate</th>
+                                    <th>Amount</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bill-items-list">
+                                <!-- Items go here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Calculations -->
+                <div class="bill-section mt-20 calculations-section">
+                    <div class="calc-row">
+                        <span>Sub Total:</span>
+                        <span>₹<span id="bill-subtotal">0.00</span></span>
+                    </div>
+                    <div class="calc-row">
+                        <span>Discount (Amount):</span>
+                        <input type="number" id="bill-discount" value="0" min="0" step="0.01" class="form-input small-input" onchange="calculateTotals()">
+                    </div>
+                    <div class="calc-row">
+                        <span>Tax (%):</span>
+                        <input type="number" id="bill-tax" value="0" min="0" step="0.1" class="form-input small-input" onchange="calculateTotals()">
+                    </div>
+                    <div class="calc-row">
+                        <span>Previous Due:</span>
+                        <span>₹<span id="bill-display-prevDue">0.00</span></span>
+                    </div>
+                    <hr>
+                    <div class="calc-row total-row">
+                        <span>Grand Total Due:</span>
+                        <span>₹<span id="bill-grandTotal">0.00</span></span>
+                    </div>
+                    <div class="calc-row mt-10">
+                        <span>Received Amount:</span>
+                        <input type="number" id="bill-received" value="0" min="0" step="0.01" class="form-input" onchange="calculateTotals()">
+                    </div>
+                    <div class="calc-row due-row mt-10">
+                        <span>New Due Amount:</span>
+                        <span>₹<span id="bill-newDue">0.00</span></span>
+                    </div>
+                </div>
+
+                <div class="mt-20">
+                    <button onclick="saveBill()" class="btn-primary w-100 btn-large">Save Bill</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- View 5: Bill Preview (for print/share) -->
+        <section id="view-billPreview" class="view" style="display: none;">
+            <div class="preview-actions">
+                <button onclick="navigateTo('dashboard')" class="btn-secondary"><i class="fa-solid fa-arrow-left"></i> Back</button>
+                <div class="action-btns">
+                    <button onclick="shareBill()" class="btn-secondary"><i class="fa-solid fa-share-nodes"></i> Share</button>
+                    <button onclick="printBill()" class="btn-primary"><i class="fa-solid fa-print"></i> Print / PDF</button>
+                </div>
+            </div>
+
+            <!-- This is the actual printable area, matching the reference image closely -->
+            <div class="bill-printable-area" id="printable-bill">
+                <div class="bill-header">
+                    <h1 id="print-brand-name">A S Start Garments</h1>
+                    <p id="print-brand-address">No: 6(A) S.V. COLONY 1st STREET P.N.ROAD TIRUPPUR</p>
+                    <p id="print-brand-contact">Phone: 9094234234 | Email: star786ar@gmail.com</p>
+                </div>
+
+                <table class="bill-info-table">
+                    <tr>
+                        <td style="width: 50%;"><strong>Name:</strong> <span id="print-cust-name"></span></td>
+                        <td style="width: 50%;"><strong>Bill No.</strong> <span id="print-bill-no"></span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Contact:</strong> <span id="print-cust-phone"></span></td>
+                        <td><strong>Date:</strong> <span id="print-bill-date"></span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><strong>Address:</strong> <span id="print-cust-address"></span></td>
+                    </tr>
+                </table>
+
+                <table class="bill-table">
+                    <thead>
+                        <tr>
+                            <th>S.N</th>
+                            <th>Name of Item</th>
+                            <th>Qty</th>
+                            <th>Rate</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="print-items-body">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+
+                <div class="bill-footer">
+                    <div class="terms">
+                        <strong>Terms & Conditions:</strong>
+                        <ul>
+                            <li>&#x29BE; Goods once sold will not be taken back.</li>
+                            <li>&#x29BE; Our responsibility ceases when goods leave our shop.</li>
+                        </ul>
+                    </div>
+                    <div class="signature">
+                        <img id="print-signature-img" src="" alt="Signature" style="display: none;">
+                        <p>Authorized Signatory</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal for adding customer -->
+    <div id="addCustomerModal" class="modal">
+        <div class="modal-content glass-card">
+            <span class="close" onclick="closeAddCustomerModal()">&times;</span>
+            <h2>Add New Customer</h2>
+            <form id="add-customer-form">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="cust-name" required>
+                </div>
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="text" id="cust-phone" required>
+                </div>
+                <div class="form-group">
+                    <label>Address</label>
+                    <input type="text" id="cust-address">
+                </div>
+                <div class="form-group">
+                    <label>Previous Due (if any)</label>
+                    <input type="number" id="cust-prevdue" value="0" step="0.01">
+                </div>
+                <button type="submit" class="btn-primary w-100">Add Customer</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Mobile Tab Bar (for Android feel) -->
+    <div class="mobile-tab-bar" id="mobile-tab-bar" style="display: none;">
+        <button class="tab-btn active" onclick="navigateTo('dashboard', this)">
+            <i class="fa-solid fa-file-invoice"></i>
+            <span>Bills</span>
+        </button>
+        <button class="tab-btn" onclick="navigateTo('createBill', this)">
+            <i class="fa-solid fa-plus-square"></i>
+            <span>Create</span>
+        </button>
+        <button class="tab-btn" onclick="navigateTo('customers', this)">
+            <i class="fa-solid fa-users"></i>
+            <span>Customers</span>
+        </button>
+        <button class="tab-btn" onclick="navigateTo('setup', this)">
+            <i class="fa-solid fa-cog"></i>
+            <span>Profile</span>
+        </button>
+    </div>
+
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then(reg => {
+                    console.log('ServiceWorker registration successful');
+                }).catch(err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
