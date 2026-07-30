@@ -2,6 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const db = require('./database');
+const cron = require('node-cron');
+const { uploadBackup, getAuthUrl, handleCallback, isAuthorized } = require('./backup');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -166,6 +169,43 @@ app.get('/api/dashboard', (req, res) => {
     });
 });
 
+// --- BACKUP & AUTH API ---
+app.get('/api/auth/google/status', (req, res) => {
+    res.json({ authorized: isAuthorized() });
+});
+
+app.get('/api/auth/google', (req, res) => {
+    const url = getAuthUrl();
+    res.redirect(url);
+});
+
+app.get('/api/auth/google/callback', async (req, res) => {
+    const code = req.query.code;
+    if (code) {
+        try {
+            await handleCallback(code);
+            res.redirect('/?backup=success');
+        } catch (error) {
+            console.error('Error handling Google Auth Callback:', error);
+            res.redirect('/?backup=error');
+        }
+    } else {
+        res.redirect('/?backup=error');
+    }
+});
+
+app.post('/api/backup/manual', async (req, res) => {
+    if (!isAuthorized()) {
+        return res.status(401).json({ error: 'Not authorized with Google Drive' });
+    }
+    const result = await uploadBackup();
+    if (result && result.success) {
+        res.json({ message: 'Backup successful', fileId: result.fileId });
+    } else {
+        res.status(500).json({ error: result ? result.error : 'Backup failed' });
+    }
+});
+
 // Fallback to index.html for SPA frontend (if requested explicitly without extension)
 app.get('*', (req, res) => {
     if (req.accepts('html')) {
@@ -173,6 +213,13 @@ app.get('*', (req, res) => {
     } else {
         res.status(404).json({ error: 'Not found' });
     }
+});
+
+// Schedule backup based on the interval in .env (default to 12 hours)
+const backupIntervalHours = parseInt(process.env.BACKUP_INTERVAL_HOURS) || 12;
+cron.schedule(`0 */${backupIntervalHours} * * *`, () => {
+    console.log(`[Cron] Running scheduled backup every ${backupIntervalHours} hours.`);
+    uploadBackup();
 });
 
 app.listen(PORT, () => {

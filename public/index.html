@@ -68,8 +68,8 @@
                     <h3 style="margin: 20px 0 10px; font-size: 1.1rem; color: var(--primary);">Data Backup & Restore</h3>
                     
                     <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #bbf7d0; text-align: center; margin-bottom: 15px;">
-                        <h4 style="color: #166534; margin-bottom: 10px;"><i class="fa-brands fa-google-drive"></i> Google Drive Cloud Sync</h4>
-                        <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 15px;">Automatically backs up your data once a day when you open the app. You can also manually sync.</p>
+                        <h4 style="color: #166534; margin-bottom: 10px;"><i class="fa-brands fa-google-drive"></i> Automated Cloud Backup</h4>
+                        <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 15px;">Automatically backs up your database to Google Drive while the app is open. You can also trigger it manually.</p>
                         
                         <div id="gdrive-auth-container" style="margin-bottom: 10px;">
                             <button type="button" class="btn-primary" onclick="handleAuthClick()" style="padding: 10px 20px; font-size: 0.9rem; margin: 0 auto;"><i class="fa-brands fa-google"></i> Connect Google Drive</button>
@@ -77,12 +77,23 @@
                         
                         <div id="gdrive-actions-container" style="display: none; flex-direction: column; gap: 10px;">
                             <div style="display: flex; gap: 10px; justify-content: center;">
-                                <button type="button" class="btn-secondary" onclick="backupToGDrive()"><i class="fa-solid fa-cloud-arrow-up"></i> Backup to Drive</button>
+                                <button type="button" class="btn-secondary" onclick="backupNowCombined()"><i class="fa-solid fa-cloud-arrow-up"></i> Backup Now (Drive & Local)</button>
                                 <button type="button" class="btn-secondary" onclick="restoreFromGDrive()"><i class="fa-solid fa-cloud-arrow-down"></i> Restore from Drive</button>
                             </div>
                             <button type="button" class="btn-secondary" onclick="handleSignoutClick()" style="color: var(--danger); margin: 0 auto; padding: 5px 15px; font-size: 0.8rem;">Disconnect</button>
                         </div>
                         <p id="gdrive-status" style="font-size: 0.85rem; color: #15803d; margin-top: 10px; font-weight: bold;"></p>
+                    </div>
+
+                    <div style="margin-bottom: 15px; text-align: center; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <label style="font-size: 0.85rem; color: #1e293b; font-weight: bold;">Auto-Backup Interval:</label>
+                        <select id="backup-interval-select" class="form-input" style="padding: 5px; width: 100px; display: inline-block; margin-left: 10px;" onchange="saveBackupInterval()">
+                            <option value="6">6 Hours</option>
+                            <option value="9">9 Hours</option>
+                            <option value="12" selected>12 Hours</option>
+                            <option value="24">24 Hours</option>
+                        </select>
+                        <p class="text-muted" style="font-size: 0.75rem; margin-top: 5px;">This triggers both Cloud and Local backups automatically when the app is open.</p>
                     </div>
 
                     <div style="display: flex; gap: 10px;">
@@ -411,8 +422,6 @@
         </button>
     </div>
 
-    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
-    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
     <script src="app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {

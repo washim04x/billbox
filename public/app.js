@@ -105,6 +105,11 @@ function localMockApi(endpoint, method, body) {
 document.addEventListener('DOMContentLoaded', () => {
     checkProfile();
     setupEventListeners();
+    
+    // Start interval logic regardless of GDrive connection
+    loadBackupInterval();
+    if (autoBackupIntervalId) clearInterval(autoBackupIntervalId);
+    autoBackupIntervalId = setInterval(checkBackupInterval, 60000);
 });
 
 function setupEventListeners() {
@@ -862,9 +867,9 @@ function importBackup(event) {
     event.target.value = '';
 }
 
-// --- GOOGLE DRIVE SYNC INTEGRATION ---
+// --- GOOGLE DRIVE SYNC INTEGRATION (FRONTEND FOR NETLIFY) ---
 
-// TODO: Replace with actual Google Client ID from Google Cloud Console
+// TODO: Replace with your actual Google Client ID from Google Cloud Console
 const CLIENT_ID = '545587129402-a7vttlks09rucnbtq80o4d24a5dnm56k.apps.googleusercontent.com';
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
@@ -874,6 +879,7 @@ let gapiInited = false;
 let gisInited = false;
 let gdriveFileName = 'BillBox_CloudBackup.json';
 let fileId = null;
+let autoBackupIntervalId = null;
 
 function gapiLoaded() {
     gapi.load('client', initializeGapiClient);
@@ -881,9 +887,7 @@ function gapiLoaded() {
 
 async function initializeGapiClient() {
     try {
-        await gapi.client.init({
-            discoveryDocs: [DISCOVERY_DOC],
-        });
+        await gapi.client.init({ discoveryDocs: [DISCOVERY_DOC] });
         gapiInited = true;
         checkAuthReady();
     } catch (e) {
@@ -912,6 +916,17 @@ function checkAuthReady() {
             document.getElementById('gdrive-status').style.color = 'var(--danger)';
         } else {
             document.getElementById('gdrive-status').innerText = 'Ready to connect to Google Drive.';
+            
+            // If we are already signed in from a previous session, restore state
+            const token = localStorage.getItem('gdrive_token');
+            if (token && token !== 'null') {
+                gapi.client.setToken(JSON.parse(token));
+                document.getElementById('gdrive-auth-container').style.display = 'none';
+                document.getElementById('gdrive-actions-container').style.display = 'flex';
+                document.getElementById('gdrive-status').innerText = 'Connected to Google Drive.';
+                
+                findExistingBackupAndSync();
+            }
         }
     }
 }
@@ -926,9 +941,12 @@ function handleAuthClick() {
         if (resp.error !== undefined) {
             throw (resp);
         }
+        gapi.client.setToken(resp);
+        localStorage.setItem('gdrive_token', JSON.stringify(resp));
         document.getElementById('gdrive-auth-container').style.display = 'none';
         document.getElementById('gdrive-actions-container').style.display = 'flex';
         document.getElementById('gdrive-status').innerText = 'Connected to Google Drive.';
+        
         await findExistingBackupAndSync();
     };
 
@@ -939,27 +957,96 @@ function handleAuthClick() {
     }
 }
 
-let syncTimeout = null;
-function triggerAutoSync() {
-    if (!gapiInited || !gisInited || !gapi.client || !gapi.client.getToken()) return;
-    
-    // Debounce background sync
-    clearTimeout(syncTimeout);
-    syncTimeout = setTimeout(() => {
-        backupToGDrive(true); 
-    }, 3000);
-}
-
 function handleSignoutClick() {
     const token = gapi.client.getToken();
     if (token !== null) {
         google.accounts.oauth2.revoke(token.access_token);
         gapi.client.setToken('');
+        localStorage.removeItem('gdrive_token');
         document.getElementById('gdrive-auth-container').style.display = 'block';
         document.getElementById('gdrive-actions-container').style.display = 'none';
         document.getElementById('gdrive-status').innerText = 'Disconnected.';
         fileId = null;
     }
+}
+
+// Backup Interval Logic
+function saveBackupInterval() {
+    const hours = document.getElementById('backup-interval-select').value;
+    localStorage.setItem('backup_interval_hours', hours);
+    document.getElementById('gdrive-status').innerText = `Auto-backup interval set to ${hours} hours.`;
+}
+
+function loadBackupInterval() {
+    const hours = localStorage.getItem('backup_interval_hours') || '12';
+    document.getElementById('backup-interval-select').value = hours;
+}
+
+async function checkBackupInterval() {
+    const hours = parseInt(localStorage.getItem('backup_interval_hours') || '12');
+    const lastBackup = parseInt(localStorage.getItem('last_backup_timestamp') || '0');
+    const now = Date.now();
+    
+    // Check if (hours) have passed since last backup
+    if (now - lastBackup > (hours * 60 * 60 * 1000)) {
+        console.log(`[Auto-Backup] ${hours} hours have passed. Triggering background backup.`);
+        
+        localStorage.setItem('last_backup_timestamp', now.toString());
+
+        // 1. GDrive Backup
+        if (typeof gapi !== 'undefined' && gapi.client && gapi.client.getToken()) {
+            await backupToGDrive(true); // silent backup
+        }
+        
+        // 2. Prompt for Local Backup
+        showLocalBackupPrompt();
+    }
+}
+
+function showLocalBackupPrompt() {
+    let toast = document.getElementById('local-backup-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'local-backup-toast';
+        toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:rgba(15,23,42,0.95);color:white;padding:15px 25px;border-radius:12px;font-size:0.95rem;font-weight:500;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,0.3);backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:10px; border-left: 4px solid var(--primary);';
+        
+        toast.innerHTML = `
+            <div><strong>Auto-Backup Time!</strong><br><span style="font-size:0.85rem;color:#cbd5e1;">It is time for your scheduled local backup.</span></div>
+            <div style="display:flex;gap:10px;">
+                <button onclick="executeScheduledLocalBackup()" style="background:var(--primary);color:white;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-weight:bold;"><i class="fa-solid fa-download"></i> Download</button>
+                <button onclick="dismissLocalBackupPrompt()" style="background:transparent;color:#94a3b8;border:1px solid #475569;padding:8px 12px;border-radius:6px;cursor:pointer;">Dismiss</button>
+            </div>
+        `;
+        document.body.appendChild(toast);
+    }
+    toast.style.display = 'flex';
+}
+
+window.executeScheduledLocalBackup = function() {
+    exportBackup();
+    dismissLocalBackupPrompt();
+};
+
+window.dismissLocalBackupPrompt = function() {
+    const toast = document.getElementById('local-backup-toast');
+    if (toast) toast.style.display = 'none';
+};
+
+async function backupNowCombined() {
+    document.getElementById('gdrive-status').innerText = 'Running manual backup (Drive & Local)...';
+    await backupToGDrive(false);
+    exportBackup();
+}
+
+let syncTimeout = null;
+function triggerAutoSync() {
+    if (!gapiInited || !gisInited || !gapi.client || !gapi.client.getToken()) return;
+    
+    // Original behavior: Debounce background sync when data changes
+    clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(() => {
+        backupToGDrive(true); 
+    }, 3000);
 }
 
 async function findExistingBackupAndSync() {
@@ -971,9 +1058,9 @@ async function findExistingBackupAndSync() {
         });
         const files = response.result.files;
         if (files && files.length > 0) {
-            fileId = files[0].id;
+            fileId = files[0].id; // We found the existing file to OVERWRITE
             const modified = new Date(files[0].modifiedTime).toLocaleString();
-            document.getElementById('gdrive-status').innerText = `Syncing with cloud...`;
+            document.getElementById('gdrive-status').innerText = `Checking cloud backup...`;
             await autoSyncCompare(fileId);
         } else {
             fileId = null;
@@ -982,7 +1069,12 @@ async function findExistingBackupAndSync() {
         }
     } catch (err) {
         console.error('Error finding backup', err);
-        document.getElementById('gdrive-status').innerText = 'Error checking for backups.';
+        if (err && err.status === 401) {
+            document.getElementById('gdrive-status').innerText = 'Session expired. Please reconnect.';
+            handleSignoutClick();
+        } else {
+            document.getElementById('gdrive-status').innerText = 'Error checking for backups.';
+        }
     }
 }
 
@@ -1011,6 +1103,7 @@ async function autoSyncCompare(cloudFileId) {
             document.getElementById('gdrive-status').innerText = 'Sync complete.';
         } else {
             document.getElementById('gdrive-status').innerText = 'Cloud sync is up to date.';
+            checkBackupInterval(); // Check if we still need a scheduled backup
         }
     } catch (err) {
         console.error('Auto sync error', err);
@@ -1019,12 +1112,12 @@ async function autoSyncCompare(cloudFileId) {
 }
 
 async function backupToGDrive(silent = false) {
-    if (!gapi.client.getToken()) {
+    if (!gapi.client || !gapi.client.getToken()) {
         if(!silent) alert('Please connect to Google Drive first.');
         return;
     }
 
-    if(!silent) document.getElementById('gdrive-status').innerText = 'Uploading backup...';
+    if(!silent) document.getElementById('gdrive-status').innerText = 'Uploading backup to Google Drive...';
 
     const data = {
         profile: getLocal('billbox_profile'),
@@ -1049,6 +1142,7 @@ async function backupToGDrive(silent = false) {
         let method = 'POST';
 
         if (fileId) {
+            // Overwrite existing file instead of creating a new one
             url = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`;
             method = 'PATCH';
         }
@@ -1062,6 +1156,7 @@ async function backupToGDrive(silent = false) {
         const result = await response.json();
         if (result.id) {
             fileId = result.id;
+            localStorage.setItem('last_backup_timestamp', Date.now().toString());
             const timeStr = new Date().toLocaleTimeString();
             if(!silent) document.getElementById('gdrive-status').innerText = 'Backup successful! ' + timeStr;
             else document.getElementById('gdrive-status').innerText = 'Auto-synced at ' + timeStr;
@@ -1070,8 +1165,13 @@ async function backupToGDrive(silent = false) {
         }
     } catch (err) {
         console.error('Backup error', err);
-        if(!silent) document.getElementById('gdrive-status').innerText = 'Backup failed.';
-        else document.getElementById('gdrive-status').innerText = 'Auto-sync failed.';
+        if (err && err.status === 401) {
+            if(!silent) document.getElementById('gdrive-status').innerText = 'Session expired. Please reconnect.';
+            handleSignoutClick();
+        } else {
+            if(!silent) document.getElementById('gdrive-status').innerText = 'Backup failed.';
+            else document.getElementById('gdrive-status').innerText = 'Auto-sync failed.';
+        }
     }
 }
 
@@ -1103,6 +1203,5 @@ async function restoreFromGDrive() {
     } catch (err) {
         console.error('Restore error', err);
         document.getElementById('gdrive-status').innerText = 'Restore failed.';
-        alert('Restore failed. See console for details.');
     }
 }
