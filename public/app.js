@@ -628,9 +628,40 @@ function printBill() {
     html2pdf().set(opt).from(element).save();
 }
 
+let preGeneratedShareFile = null;
+
 async function shareBill() {
     const element = document.getElementById('printable-bill');
     const filename = `Bill_${document.getElementById('print-bill-no').innerText}.pdf`;
+    
+    // Find the button and show loading state
+    const btns = document.querySelectorAll('button');
+    let shareBtn = null;
+    btns.forEach(b => { if (b.getAttribute('onclick') === 'shareBill()') shareBtn = b; });
+    
+    // If we already generated the file due to a timeout, just share it instantly.
+    if (preGeneratedShareFile) {
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'Bill Invoice',
+                    text: `Please find attached your bill for ₹${document.getElementById('print-grandtotal').innerText}`,
+                    files: [preGeneratedShareFile]
+                });
+            } catch(e) {
+                if (e.name !== 'AbortError') alert("Could not share. Please use the Print/PDF button.");
+            }
+        }
+        // Reset the button
+        preGeneratedShareFile = null;
+        if (shareBtn) {
+            shareBtn.innerHTML = '<i class="fa-solid fa-share-nodes"></i> Share';
+            shareBtn.classList.remove('btn-primary');
+            shareBtn.classList.add('btn-secondary');
+        }
+        return;
+    }
+
     const opt = {
         margin: 0.2,
         filename: filename,
@@ -639,15 +670,10 @@ async function shareBill() {
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
     };
 
-    // Find the button and show loading state
-    const btns = document.querySelectorAll('button');
-    let shareBtn = null;
-    btns.forEach(b => { if (b.getAttribute('onclick') === 'shareBill()') shareBtn = b; });
-
     let originalText = '';
     if (shareBtn) {
         originalText = shareBtn.innerHTML;
-        shareBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Wait...';
+        shareBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing...';
         shareBtn.disabled = true;
     }
 
@@ -660,31 +686,58 @@ async function shareBill() {
             // navigator.canShare is not available on all browsers that support navigator.share
             if (navigator.canShare && !navigator.canShare({ files: [file] })) {
                 alert("Your browser/device doesn't support sharing PDF files directly. Please use the Print/PDF button to save it first.");
-            } else {
-                try {
-                    await navigator.share({
-                        title: 'Bill Invoice',
-                        text: `Please find attached your bill for ₹${document.getElementById('print-grandtotal').innerText}`,
-                        files: [file]
-                    });
-                } catch (shareErr) {
-                    if (shareErr.name !== 'AbortError') {
-                        console.error('Error sharing:', shareErr);
-                        if (shareErr.name === 'NotAllowedError') {
-                            alert("Sharing timed out or is not allowed. Please use the Print/PDF button to save the bill instead.");
-                        } else {
-                            alert("Could not share the file. Please use the Print/PDF button to save it first.");
-                        }
+                if (shareBtn) {
+                    shareBtn.innerHTML = originalText;
+                    shareBtn.disabled = false;
+                }
+                return;
+            }
+            
+            try {
+                await navigator.share({
+                    title: 'Bill Invoice',
+                    text: `Please find attached your bill for ₹${document.getElementById('print-grandtotal').innerText}`,
+                    files: [file]
+                });
+                
+                if (shareBtn) {
+                    shareBtn.innerHTML = originalText;
+                    shareBtn.disabled = false;
+                }
+            } catch (shareErr) {
+                if (shareErr.name === 'NotAllowedError') {
+                    // User gesture expired! Require one more click.
+                    preGeneratedShareFile = file;
+                    if (shareBtn) {
+                        shareBtn.innerHTML = '<i class="fa-solid fa-check"></i> Tap to Share Now';
+                        shareBtn.classList.remove('btn-secondary');
+                        shareBtn.classList.add('btn-primary'); // Make it stand out
+                        shareBtn.disabled = false;
+                    }
+                } else if (shareErr.name !== 'AbortError') {
+                    alert("Could not share the file. Please use the Print/PDF button to save it first.");
+                    if (shareBtn) {
+                        shareBtn.innerHTML = originalText;
+                        shareBtn.disabled = false;
+                    }
+                } else {
+                    // Aborted by user
+                    if (shareBtn) {
+                        shareBtn.innerHTML = originalText;
+                        shareBtn.disabled = false;
                     }
                 }
             }
         } else {
             alert("Your browser/device doesn't support sharing. Please use the Print/PDF button to save it first.");
+            if (shareBtn) {
+                shareBtn.innerHTML = originalText;
+                shareBtn.disabled = false;
+            }
         }
     } catch (err) {
         console.error('Error generating PDF:', err);
         alert("Something went wrong while preparing the bill for sharing.");
-    } finally {
         if (shareBtn) {
             shareBtn.innerHTML = originalText;
             shareBtn.disabled = false;
