@@ -656,55 +656,24 @@ function renderPrintPreview(billData) {
         sigImg.src = '';
         sigImg.style.display = 'none';
     }
-
-    // Kick off background PDF generation so it's ready when user taps Share
-    setTimeout(() => preGeneratePdf(), 500);
 }
 
 function printBill() {
     const element = document.getElementById('printable-bill');
-    const opt = {
-        margin: 0.2,
-        filename: `Bill_${document.getElementById('print-bill-no').innerText}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
+    const filename = `Bill_${document.getElementById('print-bill-no').innerText}.pdf`;
+    const opt = getPdfOptions(filename);
     html2pdf().set(opt).from(element).save();
 }
 
-// Holds the pre-generated PDF blob (not File, so we can create fresh Object URLs)
-let preGeneratedPdfBlob = null;
-let isPdfGenerating = false;
-
-// Called automatically after the bill preview renders — generates PDF silently in background
-async function preGeneratePdf() {
-    const element = document.getElementById('printable-bill');
-    if (!element || isPdfGenerating) return;
-    const opt = {
+// PDF Options - shared across print and share to guarantee same layout
+function getPdfOptions(filename) {
+    return {
         margin: 0.2,
-        filename: 'bill.pdf',
-        image: { type: 'jpeg', quality: 0.92 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, windowWidth: 800 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
     };
-    isPdfGenerating = true;
-    preGeneratedPdfBlob = null;
-    try {
-        const blob = await html2pdf().set(opt).from(element).outputPdf('blob');
-        preGeneratedPdfBlob = blob;
-        // Update share button to show it's ready
-        const shareBtn = document.querySelector('button[onclick="shareBill()"]');
-        if (shareBtn && !shareBtn.disabled) {
-            shareBtn.innerHTML = '<i class="fa-solid fa-share-nodes"></i> Share PDF';
-            shareBtn.classList.remove('btn-secondary');
-            shareBtn.classList.add('btn-primary');
-        }
-    } catch(e) {
-        console.warn('Background PDF generation failed:', e);
-    } finally {
-        isPdfGenerating = false;
-    }
 }
 
 // Reliably download the PDF (works on laptop AND mobile)
@@ -717,19 +686,9 @@ async function shareBill() {
     if (shareBtn) { shareBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing...'; shareBtn.disabled = true; }
 
     try {
-        let blob = preGeneratedPdfBlob;
-        if (!blob) {
-            const element = document.getElementById('printable-bill');
-            const opt = {
-                margin: 0.2,
-                filename: filename,
-                image: { type: 'jpeg', quality: 0.92 },
-                html2canvas: { scale: 2, useCORS: true, logging: false },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-            };
-            blob = await html2pdf().set(opt).from(element).outputPdf('blob');
-            preGeneratedPdfBlob = blob;
-        }
+        const element = document.getElementById('printable-bill');
+        const opt = getPdfOptions(filename);
+        const blob = await html2pdf().set(opt).from(element).outputPdf('blob');
 
         const file = new File([blob], filename, { type: 'application/pdf' });
 
@@ -782,19 +741,9 @@ async function shareToWhatsApp() {
     if (waBtn) { waBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing...'; waBtn.disabled = true; }
 
     try {
-        let blob = preGeneratedPdfBlob;
-        if (!blob) {
-            const element = document.getElementById('printable-bill');
-            const opt = {
-                margin: 0.2,
-                filename: filename,
-                image: { type: 'jpeg', quality: 0.92 },
-                html2canvas: { scale: 2, useCORS: true, logging: false },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-            };
-            blob = await html2pdf().set(opt).from(element).outputPdf('blob');
-            preGeneratedPdfBlob = blob;
-        }
+        const element = document.getElementById('printable-bill');
+        const opt = getPdfOptions(filename);
+        const blob = await html2pdf().set(opt).from(element).outputPdf('blob');
 
         const file = new File([blob], filename, { type: 'application/pdf' });
 
