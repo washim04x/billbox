@@ -221,6 +221,8 @@ function navigateTo(viewId, tabBtn = null) {
         billItems = []; // reset items
         renderBillItems();
         loadCustomerSelect();
+        const today = new Date();
+        document.getElementById('bill-date-input').value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
     }
 }
 
@@ -511,9 +513,12 @@ async function saveBill() {
 
     calculateTotals();
 
+    const dateVal = document.getElementById('bill-date-input').value;
+    const dateObj = dateVal ? new Date(dateVal) : new Date();
+
     const data = {
         customerId: currentSelectedCustomer.id,
-        billDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        billDate: dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
         subTotal: parseFloat(document.getElementById('bill-subtotal').innerText),
         discount: parseFloat(document.getElementById('bill-discount').value) || 0,
         tax: parseFloat(document.getElementById('bill-tax').value) || 0,
