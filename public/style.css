@@ -261,12 +261,31 @@ span[style*="--danger"] { background: var(--danger-bg); color: #b91c1c !importan
     .navbar { display: none !important; }
     .mobile-tab-bar { display: flex; }
     .item-add-form { grid-template-columns: 1fr; }
-    #app-container { padding: 1.5rem 1rem; padding-bottom: 120px; }
+    #app-container { padding: 1rem 0.5rem; padding-bottom: 120px; }
+    
+    /* Side-by-side stats */
+    .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .stat-card { padding: 12px 8px; flex-direction: column; text-align: center; gap: 8px; border-radius: 12px; }
+    .stat-icon { width: 35px; height: 35px; font-size: 1.1rem; border-radius: 10px; margin: 0 auto; }
+    .stat-details p { font-size: 0.55rem; letter-spacing: 0; }
+    .stat-details h3 { font-size: 1rem; margin-top: 4px; }
+    
+    /* Shrink tables to fit screen */
+    .glass-card { padding: 1rem 0.5rem; border-radius: 12px; }
+    .table-responsive { padding-bottom: 5px; }
+    .modern-table { border-spacing: 0 4px; }
+    .modern-table th { padding: 4px; font-size: 0.6rem; letter-spacing: 0; }
+    .modern-table td { padding: 8px 4px; font-size: 0.75rem; line-height: 1.2; word-break: break-word; }
+    
+    /* Status badges in table */
+    span[style*="--success"], span[style*="--danger"] { padding: 4px 8px; font-size: 0.65rem; }
+    
+    /* Inputs inside tables (e.g. Create Bill) */
+    .modern-table input { padding: 8px; font-size: 0.8rem; }
+    
     .bill-info-box { flex-direction: column; }
     .customer-details { border-right: none; border-bottom: 2px solid #e2e8f0; width: 100%; }
     .bill-meta { width: 100%; }
-    .stats-grid { grid-template-columns: 1fr; }
-    .stat-card { padding: 25px; }
 }
 @media print {
     body * { visibility: hidden; }
