@@ -30,6 +30,10 @@ function localMockApi(endpoint, method, body) {
             let customers = getLocal('billbox_customers') || [];
             if (method === 'GET') resolve(customers);
             else if (method === 'POST') {
+                if (customers.some(c => c.phone && c.phone === body.phone)) {
+                    resolve({ error: 'Person already available with this phone number.' });
+                    return;
+                }
                 const newCust = { ...body, id: Date.now(), previousDue: parseFloat(body.previousDue) || 0 };
                 customers.push(newCust);
                 setLocal('billbox_customers', customers);
@@ -470,14 +474,16 @@ function renderBillItems() {
     billItems.forEach((item, index) => {
         const delayClass = `delay-1`;
         tbody.innerHTML += `
-            <tr class="animate-item ${delayClass}">
-                <td>${index + 1}</td>
-                <td>${item.name}</td>
-                <td>${item.qty}</td>
-                <td>₹${item.rate.toFixed(2)}</td>
-                <td>₹${item.amount.toFixed(2)}</td>
-                <td><button onclick="removeBillItem(${index})" style="color:var(--danger); background:none; border:none; cursor:pointer;"><i class="fa-solid fa-trash"></i></button></td>
-            </tr>
+            <div class="animate-item ${delayClass}" style="background: var(--card); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow-xs);">
+                <div>
+                    <div style="font-weight: 700; color: var(--text); font-size: 0.95rem;">${item.name}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-2); margin-top: 4px;">${item.qty} x ₹${item.rate.toFixed(2)}</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="font-weight: 800; color: var(--primary); font-size: 1rem;">₹${item.amount.toFixed(2)}</div>
+                    <button type="button" onclick="removeBillItem(${index})" style="background: var(--danger-bg); color: var(--danger); border: none; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer;"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>
         `;
     });
     calculateTotals();
@@ -975,6 +981,25 @@ function handleSignoutClick() {
     }
 }
 
+async function silentTokenRefresh() {
+    return new Promise((resolve) => {
+        const originalCallback = tokenClient.callback;
+        let timeout = setTimeout(() => { tokenClient.callback = originalCallback; resolve(false); }, 10000);
+        tokenClient.callback = (resp) => {
+            clearTimeout(timeout);
+            tokenClient.callback = originalCallback;
+            if (resp.error !== undefined) resolve(false);
+            else {
+                gapi.client.setToken(resp);
+                localStorage.setItem('gdrive_token', JSON.stringify(resp));
+                resolve(true);
+            }
+        };
+        try { tokenClient.requestAccessToken({ prompt: '' }); } 
+        catch(e) { clearTimeout(timeout); tokenClient.callback = originalCallback; resolve(false); }
+    });
+}
+
 // Backup Interval Logic
 function saveBackupInterval() {
     const hours = document.getElementById('backup-interval-select').value;
@@ -1075,6 +1100,8 @@ async function findExistingBackupAndSync() {
     } catch (err) {
         console.error('Error finding backup', err);
         if (err && err.status === 401) {
+            const refreshed = await silentTokenRefresh();
+            if (refreshed) return findExistingBackupAndSync();
             document.getElementById('gdrive-status').innerText = 'Session expired. Please reconnect.';
             handleSignoutClick();
         } else {
@@ -1112,7 +1139,14 @@ async function autoSyncCompare(cloudFileId) {
         }
     } catch (err) {
         console.error('Auto sync error', err);
-        document.getElementById('gdrive-status').innerText = 'Failed to sync with cloud.';
+        if (err && err.status === 401) {
+            const refreshed = await silentTokenRefresh();
+            if (refreshed) return autoSyncCompare(cloudFileId);
+            document.getElementById('gdrive-status').innerText = 'Session expired. Please reconnect.';
+            handleSignoutClick();
+        } else {
+            document.getElementById('gdrive-status').innerText = 'Failed to sync with cloud.';
+        }
     }
 }
 
@@ -1157,6 +1191,7 @@ async function backupToGDrive(silent = false) {
             headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
             body: form
         });
+        if (response.status === 401) throw { status: 401 };
 
         const result = await response.json();
         if (result.id) {
@@ -1171,6 +1206,8 @@ async function backupToGDrive(silent = false) {
     } catch (err) {
         console.error('Backup error', err);
         if (err && err.status === 401) {
+            const refreshed = await silentTokenRefresh();
+            if (refreshed) return backupToGDrive(silent);
             if(!silent) document.getElementById('gdrive-status').innerText = 'Session expired. Please reconnect.';
             handleSignoutClick();
         } else {
@@ -1207,6 +1244,13 @@ async function restoreFromGDrive() {
         }
     } catch (err) {
         console.error('Restore error', err);
-        document.getElementById('gdrive-status').innerText = 'Restore failed.';
+        if (err && err.status === 401) {
+            const refreshed = await silentTokenRefresh();
+            if (refreshed) return restoreFromGDrive();
+            document.getElementById('gdrive-status').innerText = 'Session expired. Please reconnect.';
+            handleSignoutClick();
+        } else {
+            document.getElementById('gdrive-status').innerText = 'Restore failed.';
+        }
     }
 }

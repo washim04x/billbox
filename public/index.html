@@ -225,52 +225,58 @@
             <div class="bill-creator glass-card">
                 <!-- Customer Selection -->
                 <div class="bill-section">
-                    <h3>1. Select Customer</h3>
-                    <div style="margin-bottom: 15px;">
-                        <label style="font-size: 0.85rem; color: #64748b; margin-bottom: 5px; display: block; font-weight: 500;">Bill Date</label>
-                        <input type="date" id="bill-date-input" class="form-input" style="width: 100%;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h3>1. Bill Details</h3>
+                        <div style="text-align: right;">
+                            <label style="font-size: 0.75rem; color: var(--text-3); margin-bottom: 2px; display: block;">Date</label>
+                            <input type="date" id="bill-date-input" class="form-input" style="padding: 4px 8px; font-size: 0.85rem; border: none; background: transparent; border-bottom: 1px solid var(--primary); border-radius: 0; outline: none;">
+                        </div>
                     </div>
-                    <div class="customer-select-area">
-                        <select id="bill-customer-select" class="form-input">
-                            <option value="">-- Select Customer --</option>
-                            <!-- Populated by JS -->
-                        </select>
-                        <button onclick="showAddCustomerModal()" class="btn-secondary">New</button>
-                    </div>
-                    <div id="bill-customer-details" class="customer-info-box mt-10" style="display: none;">
-                        <p><strong>Name:</strong> <span id="bc-name"></span></p>
-                        <p><strong>Phone:</strong> <span id="bc-phone"></span></p>
-                        <p><strong>Previous Due:</strong> ₹<span id="bc-prevDue">0.00</span></p>
+                    <div class="customer-select-area" style="background: var(--bg); padding: 15px; border-radius: var(--r-md); border: 1px solid var(--border);">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.8rem; color: var(--text-2); font-weight: 600; margin-bottom: 6px; display: block;">Select Customer</label>
+                                <select id="bill-customer-select" class="form-input" style="width: 100%; font-size: 0.95rem; font-weight: 500; border: none; background: var(--card); box-shadow: var(--shadow-xs);">
+                                    <option value="">-- Choose --</option>
+                                    <!-- Populated by JS -->
+                                </select>
+                            </div>
+                            <button onclick="showAddCustomerModal()" class="btn-primary" style="margin-top: 22px; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; flex-shrink: 0;"><i class="fa-solid fa-user-plus"></i></button>
+                        </div>
+                        <div id="bill-customer-details" class="customer-info-box mt-15" style="display: none; background: var(--card); border-radius: var(--r-sm); padding: 12px; border-left: 4px solid var(--primary); box-shadow: var(--shadow-xs);">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div>
+                                    <h4 id="bc-name" style="font-size: 1rem; color: var(--text); margin-bottom: 4px;"></h4>
+                                    <p style="font-size: 0.85rem; color: var(--text-2); display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-phone" style="font-size: 0.75rem;"></i> <span id="bc-phone"></span></p>
+                                </div>
+                                <div style="text-align: right; background: var(--danger-bg); padding: 4px 8px; border-radius: 6px;">
+                                    <span style="font-size: 0.7rem; color: var(--danger); font-weight: 700; text-transform: uppercase;">Due</span>
+                                    <div style="font-size: 0.95rem; color: var(--danger); font-weight: 800;">₹<span id="bc-prevDue">0.00</span></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div class="bill-section mt-20">
                     <h3>2. Add Items</h3>
-                    <div class="item-add-form">
-                        <input type="text" id="item-name" placeholder="Item Name" class="form-input">
-                        <div class="item-row-inputs">
-                            <input type="number" id="item-qty" placeholder="Qty" class="form-input" min="1">
-                            <input type="number" id="item-rate" placeholder="Rate ₹" class="form-input" min="0" step="0.01">
+                    <div class="item-add-form" style="background: var(--bg); padding: 15px; border-radius: var(--r-md); border: 1px dashed var(--border);">
+                        <input type="text" id="item-name" placeholder="Item Name" class="form-input" style="margin-bottom: 10px;">
+                        <div class="item-row-inputs" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.75rem; color: var(--text-3); margin-bottom: 4px; display: block;">Qty</label>
+                                <input type="number" id="item-qty" placeholder="1" class="form-input" min="1">
+                            </div>
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.75rem; color: var(--text-3); margin-bottom: 4px; display: block;">Rate (₹)</label>
+                                <input type="number" id="item-rate" placeholder="0.00" class="form-input" min="0" step="0.01">
+                            </div>
                         </div>
-                        <button onclick="addBillItem()" class="btn-primary w-100"><i class="fa-solid fa-plus"></i> Add Item</button>
+                        <button onclick="addBillItem()" class="btn-primary w-100" style="padding: 12px; font-weight: 700; border-radius: 8px;"><i class="fa-solid fa-plus"></i> Add Item</button>
                     </div>
                     
-                    <div class="table-responsive mt-10">
-                        <table class="modern-table">
-                            <thead>
-                                <tr>
-                                    <th>S.No</th>
-                                    <th>Item</th>
-                                    <th>Qty</th>
-                                    <th>Rate</th>
-                                    <th>Amount</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="bill-items-list">
-                                <!-- Items go here -->
-                            </tbody>
-                        </table>
+                    <div id="bill-items-list" class="bill-item-cards mt-15">
+                        <!-- Items rendered as mobile cards here -->
                     </div>
                 </div>
 
@@ -282,11 +288,11 @@
                     </div>
                     <div class="calc-row">
                         <span>Discount (Amount):</span>
-                        <input type="number" id="bill-discount" value="0" min="0" step="0.01" class="form-input small-input" onchange="calculateTotals()">
+                        <input type="number" id="bill-discount" value="0" min="0" step="0.01" class="form-input small-input" oninput="calculateTotals()">
                     </div>
                     <div class="calc-row">
                         <span>Tax (%):</span>
-                        <input type="number" id="bill-tax" value="0" min="0" step="0.1" class="form-input small-input" onchange="calculateTotals()">
+                        <input type="number" id="bill-tax" value="0" min="0" step="0.1" class="form-input small-input" oninput="calculateTotals()">
                     </div>
                     <div class="calc-row">
                         <span>Previous Due:</span>
@@ -299,7 +305,7 @@
                     </div>
                     <div class="calc-row mt-10">
                         <span>Received Amount:</span>
-                        <input type="number" id="bill-received" value="0" min="0" step="0.01" class="form-input" onchange="calculateTotals()">
+                        <input type="number" id="bill-received" value="0" min="0" step="0.01" class="form-input" oninput="calculateTotals()">
                     </div>
                     <div class="calc-row due-row mt-10">
                         <span>New Due Amount:</span>
